@@ -34,12 +34,12 @@ fun HistorialScreen(
     mostrarNombre: Boolean,
     buscable: Boolean
 ) {
-    var filtro by rememberSaveable { mutableStateOf("") }
+    var textoDeBusqueda by rememberSaveable { mutableStateOf("") }
 
-    val lista = if (filtro.isBlank()) {
+    val registrosVisibles = if (textoDeBusqueda.isBlank()) {
         registros
     } else {
-        registros.filter { it.nombre.contains(filtro, ignoreCase = true) || it.run.contains(filtro) }
+        registros.filter { it.nombre.contains(textoDeBusqueda, ignoreCase = true) || it.run.contains(textoDeBusqueda) }
     }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
@@ -50,8 +50,8 @@ fun HistorialScreen(
         if (buscable) {
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
-                value = filtro,
-                onValueChange = { filtro = it },
+                value = textoDeBusqueda,
+                onValueChange = { textoDeBusqueda = it },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Buscar por nombre o RUN", fontSize = 13.sp, color = TextoSecundario) },
@@ -60,12 +60,12 @@ fun HistorialScreen(
         }
 
         Spacer(Modifier.height(8.dp))
-        if (lista.isEmpty()) {
+        if (registrosVisibles.isEmpty()) {
             Text("Sin registros para mostrar", fontSize = 13.sp, color = TextoSecundario)
         }
 
         LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
-            items(lista, key = { it.id }) { registro ->
+            items(registrosVisibles, key = { it.id }) { registro ->
                 FilaAsistencia(registro, mostrarNombre)
                 Divisor()
             }

@@ -7,6 +7,9 @@ import android.os.CancellationSignal
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 
+private const val ERROR_OPERACION_CANCELADA = 5
+private const val ERROR_CANCELADO_POR_EL_USUARIO = 10
+
 fun pedirHuella(context: Context, onExito: () -> Unit, onError: (String) -> Unit) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
         onError("La huella necesita Android 9 o superior")
@@ -31,7 +34,8 @@ private fun mostrarDialogoHuella(context: Context, onExito: () -> Unit, onError:
         }
 
         override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
-            if (errorCode != 5 && errorCode != 10) {
+            val elUsuarioCancelo = errorCode == ERROR_OPERACION_CANCELADA || errorCode == ERROR_CANCELADO_POR_EL_USUARIO
+            if (!elUsuarioCancelo) {
                 onError(errString?.toString() ?: "No se pudo leer la huella")
             }
         }

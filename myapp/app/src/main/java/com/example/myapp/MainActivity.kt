@@ -1,11 +1,5 @@
 package com.example.myapp
 
-import com.example.myapp.model.Rol
-import com.example.myapp.ui.AdminScreen
-import com.example.myapp.ui.LoginScreen
-import com.example.myapp.ui.TrabajadorScreen
-import com.example.myapp.viewmodel.SesionViewModel
-
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -13,9 +7,22 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.myapp.model.Rol
+import com.example.myapp.ui.AdminScreen
+import com.example.myapp.ui.LoginScreen
+import com.example.myapp.ui.TrabajadorScreen
+import com.example.myapp.ui.theme.FondoPantalla
 import com.example.myapp.ui.theme.MyappTheme
+import com.example.myapp.viewmodel.SesionViewModel
+
+private const val DURACION_CAMBIO_DE_PANTALLA_MS = 300
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -23,24 +30,43 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MyappTheme {
-                val context = LocalContext.current
                 val sesion: SesionViewModel = viewModel()
 
-                Crossfade(targetState = sesion.usuario, animationSpec = tween(300), label = "navegacion") { usuario ->
-                    if (usuario == null) {
-                        LoginScreen(
-                            onLoginSuccess = sesion::iniciar,
-                            onOlvidoPassword = {
-                                Toast.makeText(context, "Recuperación de contraseña: pendiente", Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    } else if (usuario.rol == Rol.ADMINISTRADOR) {
-                        AdminScreen(usuario, onCerrarSesion = sesion::cerrar)
-                    } else {
-                        TrabajadorScreen(usuario, onCerrarSesion = sesion::cerrar)
-                    }
+                if (sesion.cargando) {
+                    FondoMientrasSeRevisaLaSesion()
+                } else {
+                    PantallaSegunLaSesion(sesion)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun FondoMientrasSeRevisaLaSesion() {
+    Box(Modifier.fillMaxSize().background(FondoPantalla))
+}
+
+@Composable
+private fun PantallaSegunLaSesion(sesion: SesionViewModel) {
+    val context = LocalContext.current
+
+    Crossfade(
+        targetState = sesion.usuario,
+        animationSpec = tween(DURACION_CAMBIO_DE_PANTALLA_MS),
+        label = "navegacion"
+    ) { usuario ->
+        if (usuario == null) {
+            LoginScreen(
+                onLoginSuccess = sesion::iniciar,
+                onOlvidoPassword = {
+                    Toast.makeText(context, "Recuperación de contraseña: pendiente", Toast.LENGTH_SHORT).show()
+                }
+            )
+        } else if (usuario.rol == Rol.ADMINISTRADOR) {
+            AdminScreen(usuario, onCerrarSesion = sesion::cerrar)
+        } else {
+            TrabajadorScreen(usuario, onCerrarSesion = sesion::cerrar)
         }
     }
 }

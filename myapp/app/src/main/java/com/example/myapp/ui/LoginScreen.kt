@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -47,7 +48,7 @@ import com.example.myapp.viewmodel.LoginViewModel
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: (Usuario) -> Unit = {},
+    onLoginSuccess: (Usuario, Boolean) -> Unit = { _, _ -> },
     onOlvidoPassword: () -> Unit = {},
     vm: LoginViewModel = viewModel()
 ) {
@@ -63,150 +64,229 @@ fun LoginScreen(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 28.dp, vertical = 24.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(34.dp).border(1.5.dp, VerdeCenamad, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Outlined.Visibility, null, tint = VerdeCenamad, modifier = Modifier.size(18.dp))
-            }
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text("CENAMAD", fontSize = 16.sp, letterSpacing = 2.sp, color = TextoPrincipal)
-                Text("CENTRO NACIONAL DE MADERAS", fontSize = 7.sp, letterSpacing = 1.sp, color = TextoSecundario)
-            }
-        }
+        EncabezadoDeMarca()
 
         Spacer(Modifier.height(40.dp))
-        Sobretitulo("BIENVENIDO/A")
-        Spacer(Modifier.height(8.dp))
-        Text("Inicia sesión", fontSize = 28.sp, fontWeight = FontWeight.Medium, color = TextoPrincipal)
-        Spacer(Modifier.height(6.dp))
-        Text("Selecciona el tipo de acceso para continuar", fontSize = 13.sp, color = TextoSecundario)
+        TituloDeBienvenida()
 
         Spacer(Modifier.height(24.dp))
-        Row(Modifier.fillMaxWidth()) {
-            for (opcion in Rol.entries) {
-                val activo = opcion == vm.rol
-                val colorLinea by animateColorAsState(if (activo) VerdeCenamad else BordeCampo, label = "linea")
-                Column(Modifier.weight(1f).clickable { vm.cambiarRol(opcion) }) {
-                    Text(
-                        opcion.etiqueta,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-                        textAlign = TextAlign.Center,
-                        fontSize = 14.sp,
-                        fontWeight = if (activo) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (activo) TextoPrincipal else TextoSecundario
-                    )
-                    Box(Modifier.fillMaxWidth().height(2.dp).background(colorLinea))
-                }
-            }
-        }
+        SelectorDeRol(rolActivo = vm.rol, alElegir = vm::cambiarRol)
 
         Spacer(Modifier.height(24.dp))
-        Text("RUN", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = TextoPrincipal)
-        Spacer(Modifier.height(8.dp))
-        CampoFormulario(
-            valor = vm.run,
-            onChange = vm::escribirRun,
-            placeholder = "12345678-5",
-            icono = Icons.Outlined.PersonOutline,
-            error = vm.runError,
-            valido = vm.runValido,
-            ayuda = "Con guión y sin puntos, ej: 12345678-5",
-            teclado = KeyboardType.Ascii
-        )
+        CampoRun(vm)
 
         Spacer(Modifier.height(12.dp))
-        Text("Contraseña", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = TextoPrincipal)
+        CampoPassword(vm)
+
+        MensajeDeErrorGeneral(vm.errorGeneral)
+
         Spacer(Modifier.height(8.dp))
-        CampoFormulario(
-            valor = vm.password,
-            onChange = vm::escribirPassword,
-            placeholder = "••••••••",
-            icono = Icons.Outlined.LockOpen,
-            error = vm.passwordError,
-            valido = vm.passwordValida,
-            teclado = KeyboardType.Password,
-            transformacion = if (vm.verPassword) VisualTransformation.None else PasswordVisualTransformation(),
-            extra = {
-                IconButton(onClick = vm::alternarPassword) {
-                    Icon(
-                        if (vm.verPassword) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                        contentDescription = "Mostrar u ocultar contraseña",
-                        tint = TextoSecundario,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-        )
+        CasillaRecuerdame(marcada = vm.recordar, alCambiar = vm::alternarRecordar)
 
-        AnimatedVisibility(
-            visible = vm.errorGeneral != null,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically()
-        ) {
-            Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.ErrorOutline, null, tint = ErrorRojo, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(vm.errorGeneral ?: "", color = ErrorRojo, fontSize = 12.sp)
-            }
-        }
-
-        Spacer(Modifier.height(24.dp))
-        Button(
-            onClick = { vm.ingresar(onLoginSuccess) },
-            enabled = !vm.cargando,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(10.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = VerdeCenamad)
-        ) {
-            if (vm.cargando) {
-                CircularProgressIndicator(Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
-            } else {
-                Text("Ingresar", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                Spacer(Modifier.width(6.dp))
-                Icon(Icons.AutoMirrored.Outlined.ArrowForwardIos, null, modifier = Modifier.size(12.dp))
-            }
-        }
+        Spacer(Modifier.height(16.dp))
+        BotonIngresar(cargando = vm.cargando, alPresionar = { vm.ingresar(onLoginSuccess) })
 
         Spacer(Modifier.height(12.dp))
-        OutlinedButton(
-            onClick = {
-                pedirHuella(
-                    context = context,
-                    onExito = { vm.entrarConHuella(onLoginSuccess) },
-                    onError = { mensaje -> vm.mostrarError(mensaje) }
-                )
-            },
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(10.dp),
-            border = BorderStroke(1.dp, VerdeCenamad)
-        ) {
-            Icon(Icons.Outlined.Fingerprint, null, tint = VerdeCenamad, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Ingresar con huella", color = VerdeCenamad, fontSize = 14.sp)
-        }
+        BotonIngresarConHuella(alPresionar = {
+            pedirHuella(
+                context = context,
+                onExito = { vm.entrarConHuella(onLoginSuccess) },
+                onError = { mensaje -> vm.mostrarError(mensaje) }
+            )
+        })
 
         Spacer(Modifier.height(20.dp))
-        Text(
-            "¿Olvidaste tu contraseña?",
-            modifier = Modifier.fillMaxWidth().clickable(onClick = onOlvidoPassword),
-            textAlign = TextAlign.Center,
-            fontSize = 12.sp,
-            color = TextoPrincipal
-        )
+        EnlaceOlvidoPassword(onOlvidoPassword)
 
         Spacer(Modifier.height(32.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
+        AvisoDeDatosProtegidos()
+    }
+}
+
+// =====================================================================
+// Partes de la pantalla, en el orden en que se ven
+// =====================================================================
+
+@Composable
+private fun EncabezadoDeMarca() {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier.size(34.dp).border(1.5.dp, VerdeCenamad, CircleShape),
+            contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Outlined.Lock, null, tint = TextoSecundario, modifier = Modifier.size(12.dp))
-            Spacer(Modifier.width(6.dp))
-            Text("Tus datos están protegidos", fontSize = 10.sp, color = TextoSecundario)
+            Icon(Icons.Outlined.Visibility, null, tint = VerdeCenamad, modifier = Modifier.size(18.dp))
         }
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text("CENAMAD", fontSize = 16.sp, letterSpacing = 2.sp, color = TextoPrincipal)
+            Text("CENTRO NACIONAL DE MADERAS", fontSize = 7.sp, letterSpacing = 1.sp, color = TextoSecundario)
+        }
+    }
+}
+
+@Composable
+private fun TituloDeBienvenida() {
+    Sobretitulo("BIENVENIDO/A")
+    Spacer(Modifier.height(8.dp))
+    Text("Inicia sesión", fontSize = 28.sp, fontWeight = FontWeight.Medium, color = TextoPrincipal)
+    Spacer(Modifier.height(6.dp))
+    Text("Selecciona el tipo de acceso para continuar", fontSize = 13.sp, color = TextoSecundario)
+}
+
+@Composable
+private fun SelectorDeRol(rolActivo: Rol, alElegir: (Rol) -> Unit) {
+    Row(Modifier.fillMaxWidth()) {
+        for (opcion in Rol.entries) {
+            val estaActivo = opcion == rolActivo
+            val colorDeLaLinea by animateColorAsState(if (estaActivo) VerdeCenamad else BordeCampo, label = "linea")
+
+            Column(Modifier.weight(1f).clickable { alElegir(opcion) }) {
+                Text(
+                    opcion.etiqueta,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                    textAlign = TextAlign.Center,
+                    fontSize = 14.sp,
+                    fontWeight = if (estaActivo) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (estaActivo) TextoPrincipal else TextoSecundario
+                )
+                Box(Modifier.fillMaxWidth().height(2.dp).background(colorDeLaLinea))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CampoRun(vm: LoginViewModel) {
+    EtiquetaDeCampo("RUN")
+    Spacer(Modifier.height(8.dp))
+    CampoFormulario(
+        valor = vm.run,
+        onChange = vm::escribirRun,
+        placeholder = "12345678-5",
+        icono = Icons.Outlined.PersonOutline,
+        error = vm.runError,
+        valido = vm.runValido,
+        ayuda = "Con guión y sin puntos, ej: 12345678-5",
+        teclado = KeyboardType.Ascii
+    )
+}
+
+@Composable
+private fun CampoPassword(vm: LoginViewModel) {
+    EtiquetaDeCampo("Contraseña")
+    Spacer(Modifier.height(8.dp))
+    CampoFormulario(
+        valor = vm.password,
+        onChange = vm::escribirPassword,
+        placeholder = "••••••••",
+        icono = Icons.Outlined.LockOpen,
+        error = vm.passwordError,
+        valido = vm.passwordValida,
+        teclado = KeyboardType.Password,
+        transformacion = if (vm.verPassword) VisualTransformation.None else PasswordVisualTransformation(),
+        extra = { BotonMostrarOcultarPassword(visible = vm.verPassword, alPresionar = vm::alternarPassword) }
+    )
+}
+
+@Composable
+private fun BotonMostrarOcultarPassword(visible: Boolean, alPresionar: () -> Unit) {
+    IconButton(onClick = alPresionar) {
+        Icon(
+            if (visible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+            contentDescription = "Mostrar u ocultar contraseña",
+            tint = TextoSecundario,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+@Composable
+private fun MensajeDeErrorGeneral(mensaje: String?) {
+    AnimatedVisibility(
+        visible = mensaje != null,
+        enter = fadeIn() + expandVertically(),
+        exit = fadeOut() + shrinkVertically()
+    ) {
+        Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.ErrorOutline, null, tint = ErrorRojo, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(mensaje ?: "", color = ErrorRojo, fontSize = 12.sp)
+        }
+    }
+}
+
+@Composable
+private fun CasillaRecuerdame(marcada: Boolean, alCambiar: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Checkbox, onClick = alCambiar),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = marcada,
+            onCheckedChange = null,
+            colors = CheckboxDefaults.colors(checkedColor = VerdeCenamad)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text("Recuérdame en este dispositivo", fontSize = 13.sp, color = TextoPrincipal)
+    }
+}
+
+@Composable
+private fun BotonIngresar(cargando: Boolean, alPresionar: () -> Unit) {
+    Button(
+        onClick = alPresionar,
+        enabled = !cargando,
+        modifier = Modifier.fillMaxWidth().height(52.dp),
+        shape = RoundedCornerShape(10.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = VerdeCenamad)
+    ) {
+        if (cargando) {
+            CircularProgressIndicator(Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+        } else {
+            Text("Ingresar", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Spacer(Modifier.width(6.dp))
+            Icon(Icons.AutoMirrored.Outlined.ArrowForwardIos, null, modifier = Modifier.size(12.dp))
+        }
+    }
+}
+
+@Composable
+private fun BotonIngresarConHuella(alPresionar: () -> Unit) {
+    OutlinedButton(
+        onClick = alPresionar,
+        modifier = Modifier.fillMaxWidth().height(52.dp),
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, VerdeCenamad)
+    ) {
+        Icon(Icons.Outlined.Fingerprint, null, tint = VerdeCenamad, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(8.dp))
+        Text("Ingresar con huella", color = VerdeCenamad, fontSize = 14.sp)
+    }
+}
+
+@Composable
+private fun EnlaceOlvidoPassword(alPresionar: () -> Unit) {
+    Text(
+        "¿Olvidaste tu contraseña?",
+        modifier = Modifier.fillMaxWidth().clickable(onClick = alPresionar),
+        textAlign = TextAlign.Center,
+        fontSize = 12.sp,
+        color = TextoPrincipal
+    )
+}
+
+@Composable
+private fun AvisoDeDatosProtegidos() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.Outlined.Lock, null, tint = TextoSecundario, modifier = Modifier.size(12.dp))
+        Spacer(Modifier.width(6.dp))
+        Text("Tus datos están protegidos", fontSize = 10.sp, color = TextoSecundario)
     }
 }
 

@@ -35,6 +35,10 @@ import com.example.myapp.ui.theme.TextoPrincipal
 import com.example.myapp.ui.theme.TextoSecundario
 import com.example.myapp.ui.theme.VerdeCenamad
 
+// =====================================================================
+// Marco común de las pantallas con sesión iniciada
+// =====================================================================
+
 data class ItemNav(val etiqueta: String, val icono: ImageVector)
 
 @Composable
@@ -48,11 +52,11 @@ fun MarcoPrincipal(
     onMensajeVisto: () -> Unit,
     contenido: @Composable (Int) -> Unit
 ) {
-    val snackbar = remember { SnackbarHostState() }
+    val mensajesEmergentes = remember { SnackbarHostState() }
 
     LaunchedEffect(mensaje) {
         if (mensaje != null) {
-            snackbar.showSnackbar(mensaje)
+            mensajesEmergentes.showSnackbar(mensaje)
             onMensajeVisto()
         }
     }
@@ -61,10 +65,10 @@ fun MarcoPrincipal(
         containerColor = FondoPantalla,
         topBar = { BarraSuperior(iniciales, onCerrarSesion) },
         bottomBar = { BarraNavegacion(items, tab, onTab) },
-        snackbarHost = { SnackbarHost(snackbar) }
+        snackbarHost = { SnackbarHost(mensajesEmergentes) }
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
-            Crossfade(targetState = tab, label = "pestañas") { t -> contenido(t) }
+            Crossfade(targetState = tab, label = "pestañas") { pestana -> contenido(pestana) }
         }
     }
 }
@@ -83,9 +87,7 @@ fun BarraSuperior(iniciales: String, onCerrarSesion: () -> Unit) {
         Spacer(Modifier.width(10.dp))
         Text("CENAMAD", color = Color.White, fontSize = 15.sp, letterSpacing = 2.sp, modifier = Modifier.weight(1f))
 
-        Box(Modifier.size(32.dp).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
-            Text(iniciales, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = VerdeCenamad)
-        }
+        CirculoConIniciales(iniciales)
         IconButton(onClick = onCerrarSesion) {
             Icon(Icons.AutoMirrored.Outlined.Logout, "Cerrar sesión", tint = Color.White)
         }
@@ -93,12 +95,19 @@ fun BarraSuperior(iniciales: String, onCerrarSesion: () -> Unit) {
 }
 
 @Composable
+private fun CirculoConIniciales(iniciales: String) {
+    Box(Modifier.size(32.dp).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
+        Text(iniciales, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = VerdeCenamad)
+    }
+}
+
+@Composable
 fun BarraNavegacion(items: List<ItemNav>, seleccionado: Int, onSelect: (Int) -> Unit) {
     NavigationBar(containerColor = FondoCampo) {
-        items.forEachIndexed { i, item ->
+        items.forEachIndexed { posicion, item ->
             NavigationBarItem(
-                selected = i == seleccionado,
-                onClick = { onSelect(i) },
+                selected = posicion == seleccionado,
+                onClick = { onSelect(posicion) },
                 icon = { Icon(item.icono, item.etiqueta) },
                 label = { Text(item.etiqueta, fontSize = 10.sp) },
                 colors = NavigationBarItemDefaults.colors(
@@ -113,9 +122,18 @@ fun BarraNavegacion(items: List<ItemNav>, seleccionado: Int, onSelect: (Int) -> 
     }
 }
 
+// =====================================================================
+// Piezas pequeñas que se repiten en varias pantallas
+// =====================================================================
+
 @Composable
 fun Sobretitulo(texto: String) {
     Text(texto, fontSize = 10.sp, letterSpacing = 1.5.sp, color = TextoSecundario)
+}
+
+@Composable
+fun EtiquetaDeCampo(texto: String) {
+    Text(texto, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = TextoPrincipal)
 }
 
 @Composable
@@ -130,6 +148,10 @@ fun ChipEstado(texto: String, color: Color) {
     }
 }
 
+// =====================================================================
+// Campo de formulario con ícono, borde animado y mensaje de error o ayuda
+// =====================================================================
+
 @Composable
 fun CampoFormulario(
     valor: String,
@@ -143,34 +165,27 @@ fun CampoFormulario(
     transformacion: VisualTransformation = VisualTransformation.None,
     extra: @Composable (() -> Unit)? = null
 ) {
-    val colorBorde by animateColorAsState(if (valido) OkVerde else BordeCampo, label = "borde")
-
-    val iconoFinal: (@Composable () -> Unit)? = extra ?: if (valido) {
-        ({ Icon(Icons.Outlined.CheckCircle, "Válido", tint = OkVerde, modifier = Modifier.size(18.dp)) })
-    } else null
+    val hayError = error != null
+    val colorDelBorde by animateColorAsState(if (valido) OkVerde else BordeCampo, label = "borde")
 
     OutlinedTextField(
         value = valor,
         onValueChange = onChange,
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
-        isError = error != null,
+        isError = hayError,
         placeholder = { Text(placeholder, color = TextoSecundario, fontSize = 14.sp) },
         leadingIcon = {
-            Icon(icono, null, tint = if (error != null) ErrorRojo else TextoSecundario, modifier = Modifier.size(18.dp))
+            Icon(icono, null, tint = if (hayError) ErrorRojo else TextoSecundario, modifier = Modifier.size(18.dp))
         },
-        trailingIcon = iconoFinal,
-        supportingText = {
-            AnimatedVisibility(visible = error != null || ayuda != null, enter = fadeIn(), exit = fadeOut()) {
-                Text(error ?: ayuda ?: "", fontSize = 11.sp, color = if (error != null) ErrorRojo else TextoSecundario)
-            }
-        },
+        trailingIcon = iconoAlFinalDelCampo(extra, valido),
+        supportingText = { TextoDeApoyo(error, ayuda) },
         visualTransformation = transformacion,
         keyboardOptions = KeyboardOptions(keyboardType = teclado),
         shape = RoundedCornerShape(10.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = VerdeCenamad,
-            unfocusedBorderColor = colorBorde,
+            unfocusedBorderColor = colorDelBorde,
             errorBorderColor = ErrorRojo,
             focusedContainerColor = FondoCampo,
             unfocusedContainerColor = FondoCampo,
@@ -179,33 +194,74 @@ fun CampoFormulario(
     )
 }
 
+private fun iconoAlFinalDelCampo(extra: @Composable (() -> Unit)?, valido: Boolean): (@Composable () -> Unit)? {
+    if (extra != null) return extra
+    if (!valido) return null
+    return { Icon(Icons.Outlined.CheckCircle, "Válido", tint = OkVerde, modifier = Modifier.size(18.dp)) }
+}
+
 @Composable
-fun FilaAsistencia(a: Asistencia, mostrarNombre: Boolean) {
-    val estado = if (a.salida == null) "En curso" else if (a.manual) "Registro manual" else "Completado"
-    val titulo = if (mostrarNombre) a.nombre else if (a.fecha == Fechas.hoy()) "Hoy" else Fechas.nombreDia(a.fecha)
+private fun TextoDeApoyo(error: String?, ayuda: String?) {
+    AnimatedVisibility(visible = error != null || ayuda != null, enter = fadeIn(), exit = fadeOut()) {
+        Text(error ?: ayuda ?: "", fontSize = 11.sp, color = if (error != null) ErrorRojo else TextoSecundario)
+    }
+}
 
+// =====================================================================
+// Fila del historial de asistencias
+// =====================================================================
+
+@Composable
+fun FilaAsistencia(asistencia: Asistencia, mostrarNombre: Boolean) {
     Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.width(44.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(Fechas.dia(a.fecha), fontSize = 18.sp, color = TextoPrincipal)
-            Text(Fechas.mes(a.fecha), fontSize = 9.sp, color = TextoSecundario)
-        }
+        DiaYMes(asistencia.fecha)
         Spacer(Modifier.width(12.dp))
+        TituloYEstado(asistencia, mostrarNombre, Modifier.weight(1f))
+        HorasDeEntradaYSalida(asistencia)
+    }
+}
 
-        Column(Modifier.weight(1f)) {
-            Text(titulo, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TextoPrincipal)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val detalle = if (mostrarNombre) "${Fechas.nombreDia(a.fecha)} · $estado" else estado
-                Text(detalle, fontSize = 11.sp, color = if (a.salida == null) OkVerde else TextoSecundario)
-                if (a.lat != null) {
-                    Spacer(Modifier.width(6.dp))
-                    Icon(Icons.Outlined.Place, "Con ubicación", tint = TextoSecundario, modifier = Modifier.size(12.dp))
-                }
+@Composable
+private fun DiaYMes(fecha: String) {
+    Column(Modifier.width(44.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(Fechas.dia(fecha), fontSize = 18.sp, color = TextoPrincipal)
+        Text(Fechas.mes(fecha), fontSize = 9.sp, color = TextoSecundario)
+    }
+}
+
+@Composable
+private fun TituloYEstado(asistencia: Asistencia, mostrarNombre: Boolean, modifier: Modifier) {
+    val estado = estadoDelRegistro(asistencia)
+    val titulo = when {
+        mostrarNombre -> asistencia.nombre
+        asistencia.fecha == Fechas.hoy() -> "Hoy"
+        else -> Fechas.nombreDia(asistencia.fecha)
+    }
+    val detalle = if (mostrarNombre) "${Fechas.nombreDia(asistencia.fecha)} · $estado" else estado
+    val sigueEnCurso = asistencia.salida == null
+
+    Column(modifier) {
+        Text(titulo, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TextoPrincipal)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(detalle, fontSize = 11.sp, color = if (sigueEnCurso) OkVerde else TextoSecundario)
+            if (asistencia.lat != null) {
+                Spacer(Modifier.width(6.dp))
+                Icon(Icons.Outlined.Place, "Con ubicación", tint = TextoSecundario, modifier = Modifier.size(12.dp))
             }
         }
+    }
+}
 
-        Column(horizontalAlignment = Alignment.End) {
-            Text("Entrada  ${a.entrada ?: "--:--"}", fontSize = 12.sp, color = TextoPrincipal)
-            Text("Salida  ${a.salida ?: "--:--"}", fontSize = 12.sp, color = TextoPrincipal)
-        }
+private fun estadoDelRegistro(asistencia: Asistencia): String = when {
+    asistencia.salida == null -> "En curso"
+    asistencia.manual -> "Registro manual"
+    else -> "Completado"
+}
+
+@Composable
+private fun HorasDeEntradaYSalida(asistencia: Asistencia) {
+    Column(horizontalAlignment = Alignment.End) {
+        Text("Entrada  ${asistencia.entrada ?: "--:--"}", fontSize = 12.sp, color = TextoPrincipal)
+        Text("Salida  ${asistencia.salida ?: "--:--"}", fontSize = 12.sp, color = TextoPrincipal)
     }
 }

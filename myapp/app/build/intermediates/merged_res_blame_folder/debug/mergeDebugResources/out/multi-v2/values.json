@@ -21,6 +21,23 @@
                     }
                 },
                 {
+                    "source": "C:\\Users\\danie\\Downloads\\maderas-main (3)\\maderas-main\\myapp\\app\\src\\main\\res\\values\\themes.xml",
+                    "from": {
+                        "startLines": "3",
+                        "startColumns": "4",
+                        "startOffsets": "56",
+                        "endColumns": "82",
+                        "endOffsets": "134"
+                    },
+                    "to": {
+                        "startLines": "329",
+                        "startColumns": "4",
+                        "startOffsets": "18753",
+                        "endColumns": "81",
+                        "endOffsets": "18830"
+                    }
+                },
+                {
                     "source": "C:\\Users\\danie\\.gradle\\caches\\9.4.1\\transforms\\ede1650baa24c607d5a8a91dbbe56eb0\\transformed\\material\\res\\values\\values.xml",
                     "from": {
                         "startLines": "2",
@@ -38,20 +55,20 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\danie\\Downloads\\proyectomaderas-main\\proyectomaderas-main\\myapp\\app\\src\\main\\res\\values\\colors.xml",
+                    "source": "C:\\Users\\danie\\Downloads\\maderas-main (3)\\maderas-main\\myapp\\app\\src\\main\\res\\values\\strings.xml",
                     "from": {
-                        "startLines": "7,2,3,4,5,6,8",
-                        "startColumns": "4,4,4,4,4,4,4",
-                        "startOffsets": "286,55,102,149,196,241,328",
-                        "endColumns": "41,46,46,46,44,44,41",
-                        "endOffsets": "323,97,144,191,236,281,365"
+                        "startLines": "1",
+                        "startColumns": "4",
+                        "startOffsets": "16",
+                        "endColumns": "42",
+                        "endOffsets": "54"
                     },
                     "to": {
-                        "startLines": "77,82,83,84,85,86,87",
-                        "startColumns": "4,4,4,4,4,4,4",
-                        "startOffsets": "2609,2963,3010,3057,3104,3149,3194",
-                        "endColumns": "41,46,46,46,44,44,41",
-                        "endOffsets": "2646,3005,3052,3099,3144,3189,3231"
+                        "startLines": "202",
+                        "startColumns": "4",
+                        "startOffsets": "9909",
+                        "endColumns": "42",
+                        "endOffsets": "9947"
                     }
                 },
                 {
@@ -86,23 +103,6 @@
                         "startOffsets": "9179",
                         "endColumns": "42",
                         "endOffsets": "9217"
-                    }
-                },
-                {
-                    "source": "C:\\Users\\danie\\Downloads\\proyectomaderas-main\\proyectomaderas-main\\myapp\\app\\src\\main\\res\\values\\themes.xml",
-                    "from": {
-                        "startLines": "3",
-                        "startColumns": "4",
-                        "startOffsets": "56",
-                        "endColumns": "82",
-                        "endOffsets": "134"
-                    },
-                    "to": {
-                        "startLines": "329",
-                        "startColumns": "4",
-                        "startOffsets": "18753",
-                        "endColumns": "81",
-                        "endOffsets": "18830"
                     }
                 },
                 {
@@ -193,23 +193,6 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\danie\\Downloads\\proyectomaderas-main\\proyectomaderas-main\\myapp\\app\\src\\main\\res\\values\\strings.xml",
-                    "from": {
-                        "startLines": "1",
-                        "startColumns": "4",
-                        "startOffsets": "16",
-                        "endColumns": "42",
-                        "endOffsets": "54"
-                    },
-                    "to": {
-                        "startLines": "202",
-                        "startColumns": "4",
-                        "startOffsets": "9909",
-                        "endColumns": "42",
-                        "endOffsets": "9947"
-                    }
-                },
-                {
                     "source": "C:\\Users\\danie\\.gradle\\caches\\9.4.1\\transforms\\003a347de13c60021d0434ba9edf3fe4\\transformed\\lifecycle-viewmodel\\res\\values\\values.xml",
                     "from": {
                         "startLines": "2",
@@ -241,6 +224,23 @@
                         "startOffsets": "9826",
                         "endColumns": "82",
                         "endOffsets": "9904"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\danie\\Downloads\\maderas-main (3)\\maderas-main\\myapp\\app\\src\\main\\res\\values\\colors.xml",
+                    "from": {
+                        "startLines": "7,2,3,4,5,6,8",
+                        "startColumns": "4,4,4,4,4,4,4",
+                        "startOffsets": "286,55,102,149,196,241,328",
+                        "endColumns": "41,46,46,46,44,44,41",
+                        "endOffsets": "323,97,144,191,236,281,365"
+                    },
+                    "to": {
+                        "startLines": "77,82,83,84,85,86,87",
+                        "startColumns": "4,4,4,4,4,4,4",
+                        "startOffsets": "2609,2963,3010,3057,3104,3149,3194",
+                        "endColumns": "41,46,46,46,44,44,41",
+                        "endOffsets": "2646,3005,3052,3099,3144,3189,3231"
                     }
                 },
                 {

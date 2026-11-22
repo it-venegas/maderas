@@ -11,13 +11,12 @@ import com.example.myapp.model.Fechas
 import com.example.myapp.model.Usuario
 import com.example.myapp.model.Validators
 import com.example.myapp.repository.AsistenciaRepository
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class AdminViewModel(app: Application) : AndroidViewModel(app) {
-
     private val repo = AsistenciaRepository.get(app)
+
+    // ---------- Datos del panel de resumen e historial ----------
 
     var historial by mutableStateOf<List<Asistencia>>(emptyList())
         private set
@@ -30,6 +29,8 @@ class AdminViewModel(app: Application) : AndroidViewModel(app) {
     var mensaje by mutableStateOf<String?>(null)
         private set
 
+    // ---------- Formulario de registro manual ----------
+
     var runSeleccionado by mutableStateOf<String?>(null)
         private set
     var fecha by mutableStateOf(Fechas.hoy())
@@ -39,16 +40,16 @@ class AdminViewModel(app: Application) : AndroidViewModel(app) {
     var salida by mutableStateOf("")
         private set
 
-    private var intento by mutableStateOf(false)
+    private var yaIntentoGuardar by mutableStateOf(false)
 
     val trabajadorError: String?
-        get() = if (intento) Validators.validarTrabajador(runSeleccionado) else null
+        get() = if (yaIntentoGuardar) Validators.validarTrabajador(runSeleccionado) else null
     val fechaError: String?
-        get() = if (fecha.isNotEmpty() || intento) Validators.validarFecha(fecha) else null
+        get() = if (fecha.isNotEmpty() || yaIntentoGuardar) Validators.validarFecha(fecha) else null
     val entradaError: String?
-        get() = if (entrada.isNotEmpty() || intento) Validators.validarHora(entrada) else null
+        get() = if (entrada.isNotEmpty() || yaIntentoGuardar) Validators.validarHora(entrada) else null
     val salidaError: String?
-        get() = if (salida.isNotEmpty() || intento) Validators.validarSalida(entrada, salida) else null
+        get() = if (salida.isNotEmpty() || yaIntentoGuardar) Validators.validarSalida(entrada, salida) else null
 
     val fechaValida: Boolean
         get() = fecha.isNotEmpty() && Validators.validarFecha(fecha) == null
@@ -56,6 +57,11 @@ class AdminViewModel(app: Application) : AndroidViewModel(app) {
         get() = entrada.isNotEmpty() && Validators.validarHora(entrada) == null
     val salidaValida: Boolean
         get() = salida.isNotEmpty() && Validators.validarSalida(entrada, salida) == null
+
+    private val formularioTieneErrores: Boolean
+        get() = fechaError != null || entradaError != null || salidaError != null
+
+    // ---------- Acciones sobre el formulario ----------
 
     fun onTrabajador(run: String) {
         runSeleccionado = run
@@ -77,34 +83,39 @@ class AdminViewModel(app: Application) : AndroidViewModel(app) {
         mensaje = null
     }
 
+    // ---------- Carga y guardado ----------
+
     fun cargar() {
         viewModelScope.launch {
             val hoy = Fechas.hoy()
-            historial = withContext(Dispatchers.IO) { repo.historial() }
-            trabajadores = withContext(Dispatchers.IO) { repo.trabajadores() }
-            presentes = withContext(Dispatchers.IO) { repo.presentes(hoy) }
-            total = withContext(Dispatchers.IO) { repo.totalTrabajadores() }
+            historial = enSegundoPlano { repo.historial() }
+            trabajadores = enSegundoPlano { repo.trabajadores() }
+            presentes = enSegundoPlano { repo.presentes(hoy) }
+            total = enSegundoPlano { repo.totalTrabajadores() }
         }
     }
 
     fun guardar() {
-        intento = true
+        yaIntentoGuardar = true
         val run = runSeleccionado
-        if (run == null || fechaError != null || entradaError != null || salidaError != null) return
+        if (run == null || formularioTieneErrores) return
 
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                repo.registrarManual(run, fecha, entrada, salida.ifBlank { null })
-            }
-            val nombre = trabajadores.firstOrNull { it.run == run }?.nombre ?: ""
-            mensaje = "Asistencia de $nombre registrada"
-
-            runSeleccionado = null
-            fecha = Fechas.hoy()
-            entrada = ""
-            salida = ""
-            intento = false
+            enSegundoPlano { repo.registrarManual(run, fecha, entrada, salida.ifBlank { null }) }
+            mensaje = "Asistencia de ${nombreDelTrabajador(run)} registrada"
+            vaciarFormulario()
             cargar()
         }
+    }
+
+    private fun nombreDelTrabajador(run: String): String =
+        trabajadores.firstOrNull { it.run == run }?.nombre ?: ""
+
+    private fun vaciarFormulario() {
+        runSeleccionado = null
+        fecha = Fechas.hoy()
+        entrada = ""
+        salida = ""
+        yaIntentoGuardar = false
     }
 }

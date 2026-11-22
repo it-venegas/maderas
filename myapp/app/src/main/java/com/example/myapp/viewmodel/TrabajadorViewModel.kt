@@ -13,12 +13,11 @@ import com.example.myapp.model.Usuario
 import com.example.myapp.repository.AsistenciaRepository
 import com.example.myapp.repository.Recursos
 import com.example.myapp.repository.Ubicacion
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+
+private const val PORCENTAJE_MAXIMO = 100
 
 class TrabajadorViewModel(app: Application) : AndroidViewModel(app) {
-
     private val repo = AsistenciaRepository.get(app)
     private var usuario: Usuario? = null
 
@@ -27,37 +26,53 @@ class TrabajadorViewModel(app: Application) : AndroidViewModel(app) {
     var mensaje by mutableStateOf<String?>(null)
         private set
 
+    // ---------- Jornada de hoy ----------
+
     val hoy: Asistencia?
         get() = historial.firstOrNull { it.fecha == Fechas.hoy() }
 
-    val minutosSemana: Int
+    // ---------- Resumen de la semana ----------
+
+    private val registrosDeEstaSemana: List<Asistencia>
         get() {
             val lunes = Fechas.inicioSemana(Fechas.hoy())
-            var total = 0
-            for (a in historial) {
-                val entrada = Fechas.minutos(a.entrada)
-                val salida = Fechas.minutos(a.salida)
-                if (a.fecha >= lunes && entrada != null && salida != null && salida > entrada) {
-                    total += salida - entrada
-                }
-            }
-            return total
+            return historial.filter { it.fecha >= lunes }
         }
 
+    val minutosSemana: Int
+        get() = registrosDeEstaSemana.sumOf { minutosTrabajados(it) }
+
     val diasSemana: Int
-        get() = historial.count { it.fecha >= Fechas.inicioSemana(Fechas.hoy()) }
+        get() = registrosDeEstaSemana.size
 
     val porcentaje: Int
         get() {
-            val esperados = minOf(5, Fechas.diaSemana(Fechas.hoy()))
-            return minOf(100, diasSemana * 100 / esperados)
+            val diasEsperadosHastaHoy = minOf(Fechas.DIAS_LABORALES_POR_SEMANA, Fechas.diaSemana(Fechas.hoy()))
+            return minOf(PORCENTAJE_MAXIMO, diasSemana * PORCENTAJE_MAXIMO / diasEsperadosHastaHoy)
         }
+
+    private fun minutosTrabajados(registro: Asistencia): Int {
+        val minutosDeEntrada = Fechas.minutos(registro.entrada) ?: return 0
+        val minutosDeSalida = Fechas.minutos(registro.salida) ?: return 0
+        return if (minutosDeSalida > minutosDeEntrada) minutosDeSalida - minutosDeEntrada else 0
+    }
+
+    // ---------- Carga del historial ----------
 
     fun cargar(u: Usuario) {
         if (usuario?.run != u.run) historial = emptyList()
         usuario = u
         cargarHistorial()
     }
+
+    private fun cargarHistorial() {
+        val trabajador = usuario ?: return
+        viewModelScope.launch {
+            historial = enSegundoPlano { repo.historial(trabajador.run) }
+        }
+    }
+
+    // ---------- Mensajes para la pantalla ----------
 
     fun avisar(texto: String) {
         mensaje = texto
@@ -67,35 +82,31 @@ class TrabajadorViewModel(app: Application) : AndroidViewModel(app) {
         mensaje = null
     }
 
-    private fun cargarHistorial() {
-        val u = usuario ?: return
+    // ---------- Marcar entrada o salida ----------
+
+    fun marcar(foto: Bitmap, ubicacion: Ubicacion?) {
+        val trabajador = usuario ?: return
         viewModelScope.launch {
-            historial = withContext(Dispatchers.IO) { repo.historial(u.run) }
+            mensaje = enSegundoPlano { registrarEntradaOSalida(trabajador, foto, ubicacion) }
+            cargarHistorial()
         }
     }
 
-    fun marcar(foto: Bitmap, ubicacion: Ubicacion?) {
-        val u = usuario ?: return
-        viewModelScope.launch {
-            val texto = withContext(Dispatchers.IO) {
-                val ruta = Recursos.guardarFoto(getApplication(), foto)
-                val fecha = Fechas.hoy()
-                val hora = Fechas.ahora()
-                val existente = repo.asistenciaDe(u.run, fecha)
-                val aviso = if (ubicacion == null) " (sin ubicación)" else ""
+    private fun registrarEntradaOSalida(trabajador: Usuario, foto: Bitmap, ubicacion: Ubicacion?): String {
+        val rutaDeLaFoto = Recursos.guardarFoto(getApplication(), foto)
+        val fecha = Fechas.hoy()
+        val hora = Fechas.ahora()
+        val registroDeHoy = repo.asistenciaDe(trabajador.run, fecha)
+        val avisoSinUbicacion = if (ubicacion == null) " (sin ubicación)" else ""
 
-                if (existente == null) {
-                    repo.registrarEntrada(u.run, fecha, hora, ubicacion?.lat, ubicacion?.lng, ruta)
-                    "Entrada registrada a las $hora$aviso"
-                } else if (existente.salida == null) {
-                    repo.registrarSalida(existente.id, hora, ruta)
-                    "Salida registrada a las $hora$aviso"
-                } else {
-                    "Tu jornada de hoy ya está completa"
-                }
-            }
-            mensaje = texto
-            cargarHistorial()
+        return if (registroDeHoy == null) {
+            repo.registrarEntrada(trabajador.run, fecha, hora, ubicacion?.lat, ubicacion?.lng, rutaDeLaFoto)
+            "Entrada registrada a las $hora$avisoSinUbicacion"
+        } else if (registroDeHoy.salida == null) {
+            repo.registrarSalida(registroDeHoy.id, hora, rutaDeLaFoto)
+            "Salida registrada a las $hora$avisoSinUbicacion"
+        } else {
+            "Tu jornada de hoy ya está completa"
         }
     }
 }

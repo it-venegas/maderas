@@ -59,12 +59,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myapp.ui.theme.FondoCampo
+import com.example.myapp.ui.theme.GrisJornadaCerrada
 import com.example.myapp.ui.theme.TextoPrincipal
 import com.example.myapp.ui.theme.TextoSecundario
 import com.example.myapp.ui.theme.VerdeCenamad
 import com.example.myapp.ui.theme.VerdeChip
 import com.example.myapp.ui.theme.VerdeSuave
 import kotlinx.coroutines.delay
+
+private const val INTERVALO_ACTUALIZAR_HORA_MS = 10_000L
+private const val DURACION_ANIMACION_CHIP_MS = 400
+private const val CANTIDAD_DE_REGISTROS_RECIENTES = 3
 
 @Composable
 fun TrabajadorScreen(usuario: Usuario, onCerrarSesion: () -> Unit, vm: TrabajadorViewModel = viewModel()) {
@@ -76,8 +81,8 @@ fun TrabajadorScreen(usuario: Usuario, onCerrarSesion: () -> Unit, vm: Trabajado
         if (foto != null) vm.marcar(foto, Recursos.ubicacion(context))
         else vm.avisar("Registro cancelado: se necesita la foto")
     }
-    val permisos = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { r ->
-        if (r[Manifest.permission.CAMERA] == true) camara.launch(null)
+    val permisos = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { resultados ->
+        if (resultados[Manifest.permission.CAMERA] == true) camara.launch(null)
         else vm.avisar("Sin permiso de cámara no se puede registrar")
     }
 
@@ -86,9 +91,14 @@ fun TrabajadorScreen(usuario: Usuario, onCerrarSesion: () -> Unit, vm: Trabajado
         items = listOf(ItemNav("Inicio", Icons.Outlined.Home), ItemNav("Historial", Icons.Outlined.History)),
         tab = tab, onTab = { tab = it }, onCerrarSesion = onCerrarSesion,
         mensaje = vm.mensaje, onMensajeVisto = vm::mensajeVisto
-    ) { t ->
-        if (t == 0) Inicio(
-            usuario, vm.hoy, vm.minutosSemana, vm.diasSemana, vm.porcentaje, vm.historial,
+    ) { pestana ->
+        if (pestana == 0) Inicio(
+            usuario = usuario,
+            hoy = vm.hoy,
+            minutosSemana = vm.minutosSemana,
+            diasSemana = vm.diasSemana,
+            porcentaje = vm.porcentaje,
+            historial = vm.historial,
             onRegistrar = { permisos.launch(Recursos.PERMISOS) },
             onVerHistorial = { tab = 1 }
         ) else HistorialScreen(
@@ -98,96 +108,174 @@ fun TrabajadorScreen(usuario: Usuario, onCerrarSesion: () -> Unit, vm: Trabajado
     }
 }
 
+// =====================================================================
+// Pestaña "Inicio"
+// =====================================================================
+
 @Composable
 private fun Inicio(
-    usuario: Usuario, hoy: Asistencia?, minutos: Int, dias: Int, porcentaje: Int, historial: List<Asistencia>,
-    onRegistrar: () -> Unit, onVerHistorial: () -> Unit
+    usuario: Usuario,
+    hoy: Asistencia?,
+    minutosSemana: Int,
+    diasSemana: Int,
+    porcentaje: Int,
+    historial: List<Asistencia>,
+    onRegistrar: () -> Unit,
+    onVerHistorial: () -> Unit
 ) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 20.dp)
     ) {
-        Sobretitulo(Fechas.saludo().uppercase())
-        Spacer(Modifier.height(6.dp))
-        Text("Hola, ${usuario.primerNombre}", fontSize = 26.sp, color = TextoPrincipal)
-        Text("Que tengas una excelente jornada", fontSize = 12.sp, color = TextoSecundario)
-        Spacer(Modifier.height(18.dp))
+        Saludo(usuario)
 
+        Spacer(Modifier.height(18.dp))
         TarjetaJornada(hoy, onRegistrar)
 
         Spacer(Modifier.height(24.dp))
-        EncabezadoSeccion("ESTA SEMANA", "Resumen de asistencia", "Ver historial", onVerHistorial)
-        FilaResumen(Icons.Outlined.AccessTime, Fechas.duracion(minutos), "Horas trabajadas")
-        FilaResumen(Icons.Outlined.CalendarMonth, "$dias de 5", "Días registrados")
-        FilaResumen(Icons.Outlined.CheckCircle, "$porcentaje%", "Asistencia")
+        ResumenDeLaSemana(minutosSemana, diasSemana, porcentaje, onVerHistorial)
 
         Spacer(Modifier.height(24.dp))
-        EncabezadoSeccion("REGISTROS", "Actividad reciente", "Ver todo", onVerHistorial)
-        if (historial.isEmpty()) Text("Aún no tienes registros", fontSize = 12.sp, color = TextoSecundario)
-        historial.take(3).forEach { FilaAsistencia(it, mostrarNombre = false); Divisor() }
+        ActividadReciente(historial, onVerHistorial)
     }
 }
 
 @Composable
-private fun TarjetaJornada(hoy: Asistencia?, onRegistrar: () -> Unit) {
-    var hora by remember { mutableStateOf(Fechas.ahora()) }
-    LaunchedEffect(Unit) { while (true) { hora = Fechas.ahora(); delay(10_000) } }
+private fun Saludo(usuario: Usuario) {
+    Sobretitulo(Fechas.saludo().uppercase())
+    Spacer(Modifier.height(6.dp))
+    Text("Hola, ${usuario.primerNombre}", fontSize = 26.sp, color = TextoPrincipal)
+    Text("Que tengas una excelente jornada", fontSize = 12.sp, color = TextoSecundario)
+}
 
-    val completa = hoy?.salida != null
-    val (estado, colorChip) = when {
-        hoy == null -> "SIN REGISTRAR" to Color(0xFF6B7F78)
-        completa -> "JORNADA COMPLETA" to Color(0xFF6B7F78)
-        else -> "JORNADA ACTIVA" to VerdeChip
+@Composable
+private fun ResumenDeLaSemana(minutosSemana: Int, diasSemana: Int, porcentaje: Int, onVerHistorial: () -> Unit) {
+    EncabezadoSeccion("ESTA SEMANA", "Resumen de asistencia", "Ver historial", onVerHistorial)
+    FilaResumen(Icons.Outlined.AccessTime, Fechas.duracion(minutosSemana), "Horas trabajadas")
+    FilaResumen(Icons.Outlined.CalendarMonth, "$diasSemana de ${Fechas.DIAS_LABORALES_POR_SEMANA}", "Días registrados")
+    FilaResumen(Icons.Outlined.CheckCircle, "$porcentaje%", "Asistencia")
+}
+
+@Composable
+private fun ActividadReciente(historial: List<Asistencia>, onVerHistorial: () -> Unit) {
+    EncabezadoSeccion("REGISTROS", "Actividad reciente", "Ver todo", onVerHistorial)
+    if (historial.isEmpty()) Text("Aún no tienes registros", fontSize = 12.sp, color = TextoSecundario)
+    historial.take(CANTIDAD_DE_REGISTROS_RECIENTES).forEach { registro ->
+        FilaAsistencia(registro, mostrarNombre = false)
+        Divisor()
     }
-    val chip by animateColorAsState(colorChip, tween(400), label = "chip")
-    val hoyStr = Fechas.hoy()
+}
+
+// =====================================================================
+// Tarjeta verde con la jornada de hoy
+// =====================================================================
+
+@Composable
+private fun TarjetaJornada(hoy: Asistencia?, onRegistrar: () -> Unit) {
+    val hora = horaActual()
+    val jornadaCompleta = hoy?.salida != null
+    val (etiquetaDeEstado, colorDeEstado) = estadoDeLaJornada(hoy)
+    val colorAnimado by animateColorAsState(colorDeEstado, tween(DURACION_ANIMACION_CHIP_MS), label = "chip")
 
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(VerdeCenamad)
-            .padding(18.dp)
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(VerdeCenamad).padding(18.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ChipEstado(estado, chip)
-            Spacer(Modifier.weight(1f))
-            Column(horizontalAlignment = Alignment.End) {
-                Text(hora, fontSize = 30.sp, fontWeight = FontWeight.Medium, color = Color.White)
-                Text("hrs", fontSize = 10.sp, color = Color.White.copy(alpha = .7f))
-            }
-        }
+        EstadoYHoraActual(etiquetaDeEstado, colorAnimado, hora)
+
         Spacer(Modifier.height(10.dp))
-        Text(Fechas.fechaLarga(hoyStr), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Color.White)
-        Text("Semana ${Fechas.semanaDelAnio(hoyStr)} · ${hoyStr.take(4)}", fontSize = 11.sp, color = Color.White.copy(alpha = .7f))
+        FechaDeHoy()
+
         Spacer(Modifier.height(16.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            BloqueHora("INGRESO", hoy?.entrada, Icons.Outlined.Check)
-            Box(Modifier.weight(1f).padding(horizontal = 10.dp).height(1.dp).background(Color.White.copy(alpha = .35f)))
-            BloqueHora("SALIDA", hoy?.salida, Icons.Outlined.AccessTime)
+        IngresoYSalida(hoy)
+
+        Spacer(Modifier.height(16.dp))
+        BotonRegistrarJornada(hoy, jornadaCompleta, onRegistrar)
+    }
+}
+
+@Composable
+private fun horaActual(): String {
+    var hora by remember { mutableStateOf(Fechas.ahora()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            hora = Fechas.ahora()
+            delay(INTERVALO_ACTUALIZAR_HORA_MS)
         }
-        Spacer(Modifier.height(16.dp))
-        Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(FondoCampo)
-                .clickable(enabled = !completa, onClick = onRegistrar).padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(Modifier.size(38.dp).background(VerdeSuave, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Outlined.CameraAlt, null, tint = VerdeCenamad, modifier = Modifier.size(20.dp))
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    when { hoy == null -> "Registrar ingreso"; completa -> "Jornada completada"; else -> "Registrar salida" },
-                    fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TextoPrincipal
-                )
-                Text("Verificación con foto y ubicación", fontSize = 10.sp, color = TextoSecundario)
-            }
-            if (!completa) Icon(Icons.AutoMirrored.Outlined.ArrowForwardIos, null, tint = TextoSecundario, modifier = Modifier.size(12.dp))
+    }
+    return hora
+}
+
+private fun estadoDeLaJornada(hoy: Asistencia?): Pair<String, Color> = when {
+    hoy == null -> "SIN REGISTRAR" to GrisJornadaCerrada
+    hoy.salida != null -> "JORNADA COMPLETA" to GrisJornadaCerrada
+    else -> "JORNADA ACTIVA" to VerdeChip
+}
+
+private fun textoDelBotonDeRegistro(hoy: Asistencia?, jornadaCompleta: Boolean): String = when {
+    hoy == null -> "Registrar ingreso"
+    jornadaCompleta -> "Jornada completada"
+    else -> "Registrar salida"
+}
+
+@Composable
+private fun EstadoYHoraActual(etiquetaDeEstado: String, colorDeEstado: Color, hora: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        ChipEstado(etiquetaDeEstado, colorDeEstado)
+        Spacer(Modifier.weight(1f))
+        Column(horizontalAlignment = Alignment.End) {
+            Text(hora, fontSize = 30.sp, fontWeight = FontWeight.Medium, color = Color.White)
+            Text("hrs", fontSize = 10.sp, color = Color.White.copy(alpha = .7f))
+        }
+    }
+}
+
+@Composable
+private fun FechaDeHoy() {
+    val fechaDeHoy = Fechas.hoy()
+    val anio = fechaDeHoy.take(4)
+    Text(Fechas.fechaLarga(fechaDeHoy), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Color.White)
+    Text(
+        "Semana ${Fechas.semanaDelAnio(fechaDeHoy)} · $anio",
+        fontSize = 11.sp, color = Color.White.copy(alpha = .7f)
+    )
+}
+
+@Composable
+private fun IngresoYSalida(hoy: Asistencia?) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        BloqueHora("INGRESO", hoy?.entrada, Icons.Outlined.Check)
+        Box(Modifier.weight(1f).padding(horizontal = 10.dp).height(1.dp).background(Color.White.copy(alpha = .35f)))
+        BloqueHora("SALIDA", hoy?.salida, Icons.Outlined.AccessTime)
+    }
+}
+
+@Composable
+private fun BotonRegistrarJornada(hoy: Asistencia?, jornadaCompleta: Boolean, onRegistrar: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(FondoCampo)
+            .clickable(enabled = !jornadaCompleta, onClick = onRegistrar).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(Modifier.size(38.dp).background(VerdeSuave, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+            Icon(Icons.Outlined.CameraAlt, null, tint = VerdeCenamad, modifier = Modifier.size(20.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                textoDelBotonDeRegistro(hoy, jornadaCompleta),
+                fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TextoPrincipal
+            )
+            Text("Verificación con foto y ubicación", fontSize = 10.sp, color = TextoSecundario)
+        }
+        if (!jornadaCompleta) {
+            Icon(Icons.AutoMirrored.Outlined.ArrowForwardIos, null, tint = TextoSecundario, modifier = Modifier.size(12.dp))
         }
     }
 }
 
 @Composable
 private fun BloqueHora(etiqueta: String, hora: String?, icono: ImageVector) {
+    val registrado = hora != null
     Row(verticalAlignment = Alignment.CenterVertically) {
-        val registrado = hora != null
         Box(
             Modifier.size(30.dp).background(if (registrado) VerdeChip else Color.Transparent, CircleShape),
             contentAlignment = Alignment.Center
@@ -199,6 +287,10 @@ private fun BloqueHora(etiqueta: String, hora: String?, icono: ImageVector) {
         }
     }
 }
+
+// =====================================================================
+// Piezas de la pestaña "Inicio"
+// =====================================================================
 
 @Composable
 private fun EncabezadoSeccion(sobre: String, titulo: String, accion: String, onAccion: () -> Unit) {

@@ -10,13 +10,12 @@ import com.example.myapp.model.Rol
 import com.example.myapp.model.Usuario
 import com.example.myapp.model.Validators
 import com.example.myapp.repository.AsistenciaRepository
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class LoginViewModel(app: Application) : AndroidViewModel(app) {
-
     private val repo = AsistenciaRepository.get(app)
+
+    // ---------- Lo que se muestra en la pantalla ----------
 
     var rol by mutableStateOf(Rol.TRABAJADOR)
         private set
@@ -26,22 +25,26 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var verPassword by mutableStateOf(false)
         private set
+    var recordar by mutableStateOf(false)
+        private set
     var cargando by mutableStateOf(false)
         private set
     var errorGeneral by mutableStateOf<String?>(null)
         private set
 
-    private var intento by mutableStateOf(false)
+    private var yaIntentoIngresar by mutableStateOf(false)
 
     val runError: String?
-        get() = if (run.isNotEmpty() || intento) Validators.validarRun(run) else null
+        get() = if (run.isNotEmpty() || yaIntentoIngresar) Validators.validarRun(run) else null
     val passwordError: String?
-        get() = if (password.isNotEmpty() || intento) Validators.validarPassword(password) else null
+        get() = if (password.isNotEmpty() || yaIntentoIngresar) Validators.validarPassword(password) else null
 
     val runValido: Boolean
         get() = run.isNotEmpty() && Validators.validarRun(run) == null
     val passwordValida: Boolean
         get() = password.isNotEmpty() && Validators.validarPassword(password) == null
+
+    // ---------- Acciones sobre el formulario ----------
 
     fun cambiarRol(nuevo: Rol) {
         rol = nuevo
@@ -62,51 +65,70 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
         verPassword = !verPassword
     }
 
+    fun alternarRecordar() {
+        recordar = !recordar
+    }
+
     fun mostrarError(texto: String) {
         errorGeneral = texto
     }
 
-    fun ingresar(onExito: (Usuario) -> Unit) {
-        intento = true
+    // ---------- Ingreso con RUN y contraseña ----------
+
+    fun ingresar(onExito: (Usuario, Boolean) -> Unit) {
+        yaIntentoIngresar = true
         if (Validators.validarRun(run) != null || Validators.validarPassword(password) != null) return
 
         cargando = true
         viewModelScope.launch {
-            val usuario = withContext(Dispatchers.IO) {
-                val u = repo.autenticar(run, password)
-                if (u != null && u.rol == rol) repo.guardarUltimoRun(u.run)
-                u
-            }
+            val usuario = enSegundoPlano { autenticarYGuardarUltimoRun() }
             cargando = false
-
-            if (usuario == null) {
-                errorGeneral = "RUN o contraseña incorrectos"
-            } else if (usuario.rol != rol) {
-                errorGeneral = "Esta cuenta no tiene acceso como ${rol.etiqueta}"
-            } else {
-                limpiar()
-                onExito(usuario)
-            }
+            terminarIngreso(usuario, onExito)
         }
     }
 
-    fun entrarConHuella(onExito: (Usuario) -> Unit) {
+    private fun autenticarYGuardarUltimoRun(): Usuario? {
+        val usuario = repo.autenticar(run, password)
+        if (usuario != null && usuario.rol == rol) repo.guardarUltimoRun(usuario.run)
+        return usuario
+    }
+
+    private fun terminarIngreso(usuario: Usuario?, onExito: (Usuario, Boolean) -> Unit) {
+        if (usuario == null) {
+            errorGeneral = "RUN o contraseña incorrectos"
+        } else if (usuario.rol != rol) {
+            errorGeneral = mensajeRolNoPermitido()
+        } else {
+            limpiar()
+            onExito(usuario, recordar)
+        }
+    }
+
+    // ---------- Ingreso con huella ----------
+
+    fun entrarConHuella(onExito: (Usuario, Boolean) -> Unit) {
         viewModelScope.launch {
-            val usuario = withContext(Dispatchers.IO) { repo.ultimoUsuario() }
+            val usuario = enSegundoPlano { repo.ultimoUsuario() }
             if (usuario == null) {
                 errorGeneral = "Primero ingresa una vez con tu RUN y contraseña"
+            } else if (usuario.rol != rol) {
+                errorGeneral = mensajeRolNoPermitido()
             } else {
                 limpiar()
-                onExito(usuario)
+                onExito(usuario, recordar)
             }
         }
     }
+
+    // ---------- Apoyo interno ----------
+
+    private fun mensajeRolNoPermitido() = "Esta cuenta no tiene acceso como ${rol.etiqueta}"
 
     private fun limpiar() {
         run = ""
         password = ""
         verPassword = false
-        intento = false
+        yaIntentoIngresar = false
         errorGeneral = null
     }
 }
