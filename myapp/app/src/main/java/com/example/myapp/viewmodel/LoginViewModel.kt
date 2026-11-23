@@ -9,11 +9,12 @@ import androidx.lifecycle.viewModelScope
 import com.example.myapp.model.Rol
 import com.example.myapp.model.Usuario
 import com.example.myapp.model.Validators
-import com.example.myapp.repository.AsistenciaRepository
+import com.example.myapp.network.ErrorDeRed
+import com.example.myapp.repository.Repositorios
 import kotlinx.coroutines.launch
 
 class LoginViewModel(app: Application) : AndroidViewModel(app) {
-    private val repo = AsistenciaRepository.get(app)
+    private val repo = Repositorios.asistencias(app)
 
     // ---------- Lo que se muestra en la pantalla ----------
 
@@ -81,13 +82,18 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
 
         cargando = true
         viewModelScope.launch {
-            val usuario = enSegundoPlano { autenticarYGuardarUltimoRun() }
-            cargando = false
-            terminarIngreso(usuario, onExito)
+            try {
+                val usuario = enSegundoPlano { autenticarYGuardarUltimoRun() }
+                terminarIngreso(usuario, onExito)
+            } catch (error: ErrorDeRed) {
+                errorGeneral = error.message
+            } finally {
+                cargando = false
+            }
         }
     }
 
-    private fun autenticarYGuardarUltimoRun(): Usuario? {
+    private suspend fun autenticarYGuardarUltimoRun(): Usuario? {
         val usuario = repo.autenticar(run, password)
         if (usuario != null && usuario.rol == rol) repo.guardarUltimoRun(usuario.run)
         return usuario
@@ -108,14 +114,18 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
 
     fun entrarConHuella(onExito: (Usuario, Boolean) -> Unit) {
         viewModelScope.launch {
-            val usuario = enSegundoPlano { repo.ultimoUsuario() }
-            if (usuario == null) {
-                errorGeneral = "Primero ingresa una vez con tu RUN y contraseña"
-            } else if (usuario.rol != rol) {
-                errorGeneral = mensajeRolNoPermitido()
-            } else {
-                limpiar()
-                onExito(usuario, recordar)
+            try {
+                val usuario = enSegundoPlano { repo.ultimoUsuario() }
+                if (usuario == null) {
+                    errorGeneral = "Primero ingresa una vez con tu RUN y contraseña"
+                } else if (usuario.rol != rol) {
+                    errorGeneral = mensajeRolNoPermitido()
+                } else {
+                    limpiar()
+                    onExito(usuario, recordar)
+                }
+            } catch (error: ErrorDeRed) {
+                errorGeneral = error.message
             }
         }
     }

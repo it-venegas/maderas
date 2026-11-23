@@ -7,11 +7,11 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapp.model.Usuario
-import com.example.myapp.repository.AsistenciaRepository
+import com.example.myapp.repository.Repositorios
 import kotlinx.coroutines.launch
 
 class SesionViewModel(app: Application) : AndroidViewModel(app) {
-    private val repo = AsistenciaRepository.get(app)
+    private val repo = Repositorios.asistencias(app)
 
     var usuario by mutableStateOf<Usuario?>(null)
         private set
@@ -24,7 +24,7 @@ class SesionViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun iniciar(usuarioQueIngresa: Usuario, recordar: Boolean) {
-        if (recordar) repo.recordarSesion(usuarioQueIngresa.run) else repo.olvidarSesion()
+        if (recordar) repo.recordarSesion(usuarioQueIngresa) else repo.olvidarSesion()
         usuario = usuarioQueIngresa
     }
 

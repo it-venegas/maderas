@@ -99,18 +99,17 @@ fun TrabajadorScreen(usuario: Usuario, onCerrarSesion: () -> Unit, vm: Trabajado
             diasSemana = vm.diasSemana,
             porcentaje = vm.porcentaje,
             historial = vm.historial,
+            feriadoDeHoy = vm.feriadoDeHoy,
             onRegistrar = { permisos.launch(Recursos.PERMISOS) },
             onVerHistorial = { tab = 1 }
         ) else HistorialScreen(
             titulo = "Mi historial", subtitulo = "REGISTROS", registros = vm.historial,
-            mostrarNombre = false, buscable = false
+            mostrarNombre = false, buscable = false, feriados = vm.feriados
         )
     }
 }
 
-// =====================================================================
-// Pestaña "Inicio"
-// =====================================================================
+// ---------- Pestaña "Inicio" ----------
 
 @Composable
 private fun Inicio(
@@ -120,6 +119,7 @@ private fun Inicio(
     diasSemana: Int,
     porcentaje: Int,
     historial: List<Asistencia>,
+    feriadoDeHoy: String?,
     onRegistrar: () -> Unit,
     onVerHistorial: () -> Unit
 ) {
@@ -129,7 +129,7 @@ private fun Inicio(
         Saludo(usuario)
 
         Spacer(Modifier.height(18.dp))
-        TarjetaJornada(hoy, onRegistrar)
+        TarjetaJornada(hoy, feriadoDeHoy, onRegistrar)
 
         Spacer(Modifier.height(24.dp))
         ResumenDeLaSemana(minutosSemana, diasSemana, porcentaje, onVerHistorial)
@@ -165,12 +165,10 @@ private fun ActividadReciente(historial: List<Asistencia>, onVerHistorial: () ->
     }
 }
 
-// =====================================================================
-// Tarjeta verde con la jornada de hoy
-// =====================================================================
+// ---------- Tarjeta de la jornada ----------
 
 @Composable
-private fun TarjetaJornada(hoy: Asistencia?, onRegistrar: () -> Unit) {
+private fun TarjetaJornada(hoy: Asistencia?, feriadoDeHoy: String?, onRegistrar: () -> Unit) {
     val hora = horaActual()
     val jornadaCompleta = hoy?.salida != null
     val (etiquetaDeEstado, colorDeEstado) = estadoDeLaJornada(hoy)
@@ -182,7 +180,7 @@ private fun TarjetaJornada(hoy: Asistencia?, onRegistrar: () -> Unit) {
         EstadoYHoraActual(etiquetaDeEstado, colorAnimado, hora)
 
         Spacer(Modifier.height(10.dp))
-        FechaDeHoy()
+        FechaDeHoy(feriadoDeHoy)
 
         Spacer(Modifier.height(16.dp))
         IngresoYSalida(hoy)
@@ -229,7 +227,7 @@ private fun EstadoYHoraActual(etiquetaDeEstado: String, colorDeEstado: Color, ho
 }
 
 @Composable
-private fun FechaDeHoy() {
+private fun FechaDeHoy(feriadoDeHoy: String?) {
     val fechaDeHoy = Fechas.hoy()
     val anio = fechaDeHoy.take(4)
     Text(Fechas.fechaLarga(fechaDeHoy), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Color.White)
@@ -237,6 +235,9 @@ private fun FechaDeHoy() {
         "Semana ${Fechas.semanaDelAnio(fechaDeHoy)} · $anio",
         fontSize = 11.sp, color = Color.White.copy(alpha = .7f)
     )
+    if (feriadoDeHoy != null) {
+        Text("Hoy es feriado: $feriadoDeHoy", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Color.White)
+    }
 }
 
 @Composable
@@ -288,9 +289,7 @@ private fun BloqueHora(etiqueta: String, hora: String?, icono: ImageVector) {
     }
 }
 
-// =====================================================================
-// Piezas de la pestaña "Inicio"
-// =====================================================================
+// ---------- Piezas de la pestaña "Inicio" ----------
 
 @Composable
 private fun EncabezadoSeccion(sobre: String, titulo: String, accion: String, onAccion: () -> Unit) {

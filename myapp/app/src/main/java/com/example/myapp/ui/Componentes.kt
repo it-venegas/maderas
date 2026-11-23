@@ -35,9 +35,7 @@ import com.example.myapp.ui.theme.TextoPrincipal
 import com.example.myapp.ui.theme.TextoSecundario
 import com.example.myapp.ui.theme.VerdeCenamad
 
-// =====================================================================
-// Marco común de las pantallas con sesión iniciada
-// =====================================================================
+// ---------- Marco principal ----------
 
 data class ItemNav(val etiqueta: String, val icono: ImageVector)
 
@@ -122,9 +120,7 @@ fun BarraNavegacion(items: List<ItemNav>, seleccionado: Int, onSelect: (Int) -> 
     }
 }
 
-// =====================================================================
-// Piezas pequeñas que se repiten en varias pantallas
-// =====================================================================
+// ---------- Piezas reutilizables ----------
 
 @Composable
 fun Sobretitulo(texto: String) {
@@ -148,9 +144,7 @@ fun ChipEstado(texto: String, color: Color) {
     }
 }
 
-// =====================================================================
-// Campo de formulario con ícono, borde animado y mensaje de error o ayuda
-// =====================================================================
+// ---------- Campo de formulario ----------
 
 @Composable
 fun CampoFormulario(
@@ -207,16 +201,14 @@ private fun TextoDeApoyo(error: String?, ayuda: String?) {
     }
 }
 
-// =====================================================================
-// Fila del historial de asistencias
-// =====================================================================
+// ---------- Fila del historial ----------
 
 @Composable
-fun FilaAsistencia(asistencia: Asistencia, mostrarNombre: Boolean) {
+fun FilaAsistencia(asistencia: Asistencia, mostrarNombre: Boolean, feriado: String? = null) {
     Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         DiaYMes(asistencia.fecha)
         Spacer(Modifier.width(12.dp))
-        TituloYEstado(asistencia, mostrarNombre, Modifier.weight(1f))
+        TituloYEstado(asistencia, mostrarNombre, feriado, Modifier.weight(1f))
         HorasDeEntradaYSalida(asistencia)
     }
 }
@@ -230,14 +222,15 @@ private fun DiaYMes(fecha: String) {
 }
 
 @Composable
-private fun TituloYEstado(asistencia: Asistencia, mostrarNombre: Boolean, modifier: Modifier) {
+private fun TituloYEstado(asistencia: Asistencia, mostrarNombre: Boolean, feriado: String?, modifier: Modifier) {
     val estado = estadoDelRegistro(asistencia)
     val titulo = when {
         mostrarNombre -> asistencia.nombre
         asistencia.fecha == Fechas.hoy() -> "Hoy"
         else -> Fechas.nombreDia(asistencia.fecha)
     }
-    val detalle = if (mostrarNombre) "${Fechas.nombreDia(asistencia.fecha)} · $estado" else estado
+    val detalleBase = if (mostrarNombre) "${Fechas.nombreDia(asistencia.fecha)} · $estado" else estado
+    val detalle = if (feriado == null) detalleBase else "$detalleBase · Feriado: $feriado"
     val sigueEnCurso = asistencia.salida == null
 
     Column(modifier) {

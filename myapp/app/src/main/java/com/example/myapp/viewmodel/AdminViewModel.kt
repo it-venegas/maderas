@@ -10,11 +10,13 @@ import com.example.myapp.model.Asistencia
 import com.example.myapp.model.Fechas
 import com.example.myapp.model.Usuario
 import com.example.myapp.model.Validators
-import com.example.myapp.repository.AsistenciaRepository
+import com.example.myapp.network.ErrorDeRed
+import com.example.myapp.repository.Repositorios
 import kotlinx.coroutines.launch
 
 class AdminViewModel(app: Application) : AndroidViewModel(app) {
-    private val repo = AsistenciaRepository.get(app)
+    private val repo = Repositorios.asistencias(app)
+    private val repoFeriados = Repositorios.feriados()
 
     // ---------- Datos del panel de resumen e historial ----------
 
@@ -27,6 +29,8 @@ class AdminViewModel(app: Application) : AndroidViewModel(app) {
     var total by mutableStateOf(0)
         private set
     var mensaje by mutableStateOf<String?>(null)
+        private set
+    var feriados by mutableStateOf<Map<String, String>>(emptyMap())
         private set
 
     // ---------- Formulario de registro manual ----------
@@ -87,11 +91,16 @@ class AdminViewModel(app: Application) : AndroidViewModel(app) {
 
     fun cargar() {
         viewModelScope.launch {
-            val hoy = Fechas.hoy()
-            historial = enSegundoPlano { repo.historial() }
-            trabajadores = enSegundoPlano { repo.trabajadores() }
-            presentes = enSegundoPlano { repo.presentes(hoy) }
-            total = enSegundoPlano { repo.totalTrabajadores() }
+            try {
+                val hoy = Fechas.hoy()
+                historial = enSegundoPlano { repo.historial() }
+                trabajadores = enSegundoPlano { repo.trabajadores() }
+                presentes = historial.count { it.fecha == hoy && it.entrada != null && it.salida == null }
+                total = trabajadores.size
+                feriados = enSegundoPlano { repoFeriados.feriados() }
+            } catch (error: ErrorDeRed) {
+                mensaje = error.message
+            }
         }
     }
 
@@ -101,10 +110,14 @@ class AdminViewModel(app: Application) : AndroidViewModel(app) {
         if (run == null || formularioTieneErrores) return
 
         viewModelScope.launch {
-            enSegundoPlano { repo.registrarManual(run, fecha, entrada, salida.ifBlank { null }) }
-            mensaje = "Asistencia de ${nombreDelTrabajador(run)} registrada"
-            vaciarFormulario()
-            cargar()
+            try {
+                enSegundoPlano { repo.registrarManual(run, fecha, entrada, salida.ifBlank { null }) }
+                mensaje = "Asistencia de ${nombreDelTrabajador(run)} registrada"
+                vaciarFormulario()
+                cargar()
+            } catch (error: ErrorDeRed) {
+                mensaje = error.message
+            }
         }
     }
 

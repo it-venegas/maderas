@@ -80,16 +80,15 @@ fun AdminScreen(usuario: Usuario, onCerrarSesion: () -> Unit, vm: AdminViewModel
             0 -> PanelResumen(usuario, vm)
             1 -> HistorialScreen(
                 titulo = "Historial del equipo", subtitulo = "TODOS LOS REGISTROS",
-                registros = vm.historial, mostrarNombre = true, buscable = true
+                registros = vm.historial, mostrarNombre = true, buscable = true,
+                feriados = vm.feriados
             )
             else -> RegistroManual(vm)
         }
     }
 }
 
-// =====================================================================
-// Pestaña "Resumen"
-// =====================================================================
+// ---------- Pestaña "Resumen" ----------
 
 @Composable
 private fun PanelResumen(usuario: Usuario, vm: AdminViewModel) {
@@ -152,9 +151,7 @@ private fun UltimosMovimientos(historial: List<Asistencia>) {
     }
 }
 
-// =====================================================================
-// Pestaña "Registrar" (asistencia manual)
-// =====================================================================
+// ---------- Pestaña "Registrar" ----------
 
 @Composable
 private fun RegistroManual(vm: AdminViewModel) {

@@ -10,26 +10,34 @@ import androidx.lifecycle.viewModelScope
 import com.example.myapp.model.Asistencia
 import com.example.myapp.model.Fechas
 import com.example.myapp.model.Usuario
-import com.example.myapp.repository.AsistenciaRepository
+import com.example.myapp.network.ErrorDeRed
 import com.example.myapp.repository.Recursos
+import com.example.myapp.repository.Repositorios
 import com.example.myapp.repository.Ubicacion
 import kotlinx.coroutines.launch
 
 private const val PORCENTAJE_MAXIMO = 100
+private const val MENSAJE_SIN_DETALLE = "No se pudo completar la operación"
 
 class TrabajadorViewModel(app: Application) : AndroidViewModel(app) {
-    private val repo = AsistenciaRepository.get(app)
+    private val repo = Repositorios.asistencias(app)
+    private val repoFeriados = Repositorios.feriados()
     private var usuario: Usuario? = null
 
     var historial by mutableStateOf<List<Asistencia>>(emptyList())
         private set
     var mensaje by mutableStateOf<String?>(null)
         private set
+    var feriados by mutableStateOf<Map<String, String>>(emptyMap())
+        private set
 
     // ---------- Jornada de hoy ----------
 
     val hoy: Asistencia?
         get() = historial.firstOrNull { it.fecha == Fechas.hoy() }
+
+    val feriadoDeHoy: String?
+        get() = feriados[Fechas.hoy()]
 
     // ---------- Resumen de la semana ----------
 
@@ -63,12 +71,21 @@ class TrabajadorViewModel(app: Application) : AndroidViewModel(app) {
         if (usuario?.run != u.run) historial = emptyList()
         usuario = u
         cargarHistorial()
+        cargarFeriados()
+    }
+
+    private fun cargarFeriados() {
+        viewModelScope.launch { feriados = enSegundoPlano { repoFeriados.feriados() } }
     }
 
     private fun cargarHistorial() {
         val trabajador = usuario ?: return
         viewModelScope.launch {
-            historial = enSegundoPlano { repo.historial(trabajador.run) }
+            try {
+                historial = enSegundoPlano { repo.historial(trabajador.run) }
+            } catch (error: ErrorDeRed) {
+                mensaje = error.message ?: MENSAJE_SIN_DETALLE
+            }
         }
     }
 
@@ -87,24 +104,26 @@ class TrabajadorViewModel(app: Application) : AndroidViewModel(app) {
     fun marcar(foto: Bitmap, ubicacion: Ubicacion?) {
         val trabajador = usuario ?: return
         viewModelScope.launch {
-            mensaje = enSegundoPlano { registrarEntradaOSalida(trabajador, foto, ubicacion) }
+            mensaje = try {
+                enSegundoPlano { registrarEntradaOSalida(trabajador, foto, ubicacion) }
+            } catch (error: ErrorDeRed) {
+                error.message ?: MENSAJE_SIN_DETALLE
+            }
             cargarHistorial()
         }
     }
 
-    private fun registrarEntradaOSalida(trabajador: Usuario, foto: Bitmap, ubicacion: Ubicacion?): String {
+    private suspend fun registrarEntradaOSalida(trabajador: Usuario, foto: Bitmap, ubicacion: Ubicacion?): String {
         val rutaDeLaFoto = Recursos.guardarFoto(getApplication(), foto)
-        val fecha = Fechas.hoy()
-        val hora = Fechas.ahora()
-        val registroDeHoy = repo.asistenciaDe(trabajador.run, fecha)
+        val registroDeHoy = repo.asistenciaDe(trabajador.run, Fechas.hoy())
         val avisoSinUbicacion = if (ubicacion == null) " (sin ubicación)" else ""
 
         return if (registroDeHoy == null) {
-            repo.registrarEntrada(trabajador.run, fecha, hora, ubicacion?.lat, ubicacion?.lng, rutaDeLaFoto)
-            "Entrada registrada a las $hora$avisoSinUbicacion"
+            val registro = repo.registrarEntrada(trabajador.run, rutaDeLaFoto, ubicacion)
+            "Entrada registrada a las ${registro.entrada}$avisoSinUbicacion"
         } else if (registroDeHoy.salida == null) {
-            repo.registrarSalida(registroDeHoy.id, hora, rutaDeLaFoto)
-            "Salida registrada a las $hora$avisoSinUbicacion"
+            val registro = repo.registrarSalida(registroDeHoy, rutaDeLaFoto)
+            "Salida registrada a las ${registro.salida}$avisoSinUbicacion"
         } else {
             "Tu jornada de hoy ya está completa"
         }

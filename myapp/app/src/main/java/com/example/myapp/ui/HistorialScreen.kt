@@ -32,7 +32,8 @@ fun HistorialScreen(
     subtitulo: String,
     registros: List<Asistencia>,
     mostrarNombre: Boolean,
-    buscable: Boolean
+    buscable: Boolean,
+    feriados: Map<String, String> = emptyMap()
 ) {
     var textoDeBusqueda by rememberSaveable { mutableStateOf("") }
 
@@ -66,7 +67,7 @@ fun HistorialScreen(
 
         LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
             items(registrosVisibles, key = { it.id }) { registro ->
-                FilaAsistencia(registro, mostrarNombre)
+                FilaAsistencia(registro, mostrarNombre, feriados[registro.fecha])
                 Divisor()
             }
         }

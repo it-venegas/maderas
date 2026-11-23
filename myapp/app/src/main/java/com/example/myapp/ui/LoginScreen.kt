@@ -103,9 +103,7 @@ fun LoginScreen(
     }
 }
 
-// =====================================================================
-// Partes de la pantalla, en el orden en que se ven
-// =====================================================================
+// ---------- Partes de la pantalla ----------
 
 @Composable
 private fun EncabezadoDeMarca() {
